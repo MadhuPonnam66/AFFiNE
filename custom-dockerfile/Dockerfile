@@ -1,18 +1,25 @@
-FROM node:22-alpine AS builder
+FROM node:22-alpine AS deps
 WORKDIR /app
-COPY . .
-RUN corepack enable 
+RUN corepack enable
+COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
-RUN node ./node_modules/.bin/affine build
+
+FROM node:22-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY . .
+COPY --from=deps /app/node_modules ./node_modules
+RUN yarn affine build
 
 FROM node:22-alpine
 WORKDIR /app
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/yarn.lock ./
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
 ENV NODE_ENV=production
+RUN corepack enable
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --production
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/public ./public
 EXPOSE 3000
-CMD ["pnpm", "start"]
+CMD ["yarn", "start"]
+
 
